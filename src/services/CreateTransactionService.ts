@@ -1,5 +1,5 @@
 import { getCustomRepository, getRepository } from 'typeorm';
-// import AppError from '../errors/AppError';
+import AppError from '../errors/AppError';
 
 import Transaction from '../models/Transaction';
 import TransactionsRepository from '../repositories/TransactionsRepository';
@@ -22,27 +22,29 @@ class CreateTransactionService {
     const categoriesRepository = getRepository(Category);
     const transactionsRepository = getCustomRepository(TransactionsRepository);
 
-    const checkCategoryExists = await categoriesRepository.findOne({
+    const { total } = await transactionsRepository.getBalance();
+
+    if (type === 'outcome' && value > total) {
+      throw new AppError('Your balance is so bad');
+    }
+
+    let checkCategoryExists = await categoriesRepository.findOne({
       where: { title: category },
     });
 
     if (!checkCategoryExists) {
-      const categoryCreate = categoriesRepository.create({
+      checkCategoryExists = categoriesRepository.create({
         title: category,
       });
 
-      await categoriesRepository.save(categoryCreate);
+      await categoriesRepository.save(checkCategoryExists);
     }
-
-    const checkCategoryId = await categoriesRepository.findOne({
-      where: { title: category },
-    });
 
     const transaction = transactionsRepository.create({
       title,
       value,
       type,
-      category_id: checkCategoryId?.id,
+      category: checkCategoryExists,
     });
 
     await transactionsRepository.save(transaction);
